@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Farsight Importer</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>Farsight Importer</h1>
+    <div id="connection-badge" class="badge badge-disconnected">Not connected</div>
+  </header>
+
+  <!-- Tab bar -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="ddb">D&amp;D Beyond</button>
+    <button class="tab" data-tab="foundry">Foundry VTT</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <!-- ── D&D Beyond Tab ──────────────────────────────────── -->
+  <section id="tab-ddb" class="tab-panel active">
+    <div id="ddb-auth-status" class="auth-status"></div>
+
+    <div id="ddb-not-logged-in" class="hint-box hidden">
+      <p>Log in to <a href="https://www.dndbeyond.com/login" target="_blank">D&amp;D Beyond</a> in this browser,
+         then reopen this popup.</p>
+    </div>
+
+    <div id="ddb-connected-ui" class="hidden">
+      <div class="section-header">
+        <span>Party</span>
+      </div>
+      <select id="ddb-party-select" class="select-field">
+        <option value="">Loading parties…</option>
+      </select>
+
+      <div class="section-header">
+        <span>Characters</span>
+        <button id="btn-refresh-chars" class="btn-icon" title="Refresh">↻</button>
+      </div>
+      <div id="ddb-chars-list" class="item-list">
+        <p class="muted">Loading…</p>
+      </div>
+
+      <div class="section-header">
+        <span>Campaigns</span>
+        <button id="btn-refresh-campaigns" class="btn-icon" title="Refresh">↻</button>
+      </div>
+      <div id="ddb-campaigns-list" class="item-list">
+        <p class="muted">Loading…</p>
+      </div>
+
+      <button id="btn-import-ddb" class="btn-primary" disabled>Import selected</button>
+      <div id="ddb-result" class="result-msg hidden"></div>
+    </div>
+  </section>
+
+  <!-- ── Foundry VTT Tab ─────────────────────────────────── -->
+  <section id="tab-foundry" class="tab-panel hidden">
+    <label class="field-label">Foundry URL
+      <input id="foundry-url" type="text" class="text-field" placeholder="http://192.168.1.X:30000" />
+    </label>
+    <label class="field-label">Username
+      <input id="foundry-user" type="text" class="text-field" placeholder="Gamemaster" />
+    </label>
+    <label class="field-label">Password
+      <input id="foundry-pass" type="password" class="text-field" placeholder="••••••••" />
+    </label>
+    <button id="btn-foundry-connect" class="btn-secondary">Connect &amp; Discover Packs</button>
+    <div id="foundry-connect-status" class="result-msg hidden"></div>
+
+    <div id="foundry-packs-ui" class="hidden">
+      <div class="section-header"><span>Available Packs</span></div>
+      <div id="foundry-packs-list" class="item-list"></div>
+      <button id="btn-import-foundry" class="btn-primary" disabled>Import selected packs</button>
+      <div id="foundry-result" class="result-msg hidden"></div>
+    </div>
+  </section>
+
+  <!-- ── Settings Tab ────────────────────────────────────── -->
+  <section id="tab-settings" class="tab-panel hidden">
+    <label class="field-label">Farsight app server URL
+      <input id="settings-server-url" type="text" class="text-field" placeholder="http://192.168.1.X:8080" />
+    </label>
+    <p class="hint">Find this in <strong>Farsight → Settings → App → Farsight Importer Extension</strong>.</p>
+    <button id="btn-save-settings" class="btn-primary">Save</button>
+    <button id="btn-test-connection" class="btn-secondary">Test connection</button>
+    <div id="settings-result" class="result-msg hidden"></div>
+  </section>
+
+  <script src="popup.js"></script>
+</body>
+</html>
