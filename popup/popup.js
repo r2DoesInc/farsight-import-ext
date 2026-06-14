@@ -8,6 +8,8 @@ let selectedCharIds = new Set();
 let selectedCampaignIds = new Set();
 let foundryPacksCache = [];
 let selectedPackIds = new Set();
+let foundryRtPacksCache = [];
+let selectedRtPackIds = new Set();
 let partiesCache = [];
 
 // ── Initialisation ────────────────────────────────────────────────────────────
@@ -247,6 +249,7 @@ function setupFoundryTab() {
 
   document.getElementById('btn-foundry-connect').addEventListener('click', connectFoundry);
   document.getElementById('btn-import-foundry').addEventListener('click', importFoundry);
+  document.getElementById('btn-import-rolltables').addEventListener('click', importRollTables);
 }
 
 async function connectFoundry() {
@@ -275,11 +278,15 @@ async function connectFoundry() {
     const data = await res.json();
     foundryPacksCache = data.packs ?? [];
     selectedPackIds.clear();
+    foundryRtPacksCache = data.rollTablePacks ?? [];
+    selectedRtPackIds.clear();
 
     const gen = data.foundryGeneration ? ` (Foundry v${data.foundryGeneration})` : '';
     const title = data.worldTitle ? `"${data.worldTitle}"` : 'World';
-    showResult('foundry-connect-status', `Connected to ${title}${gen}. ${foundryPacksCache.length} pack(s) found.`, 'success');
+    const rtCount = foundryRtPacksCache.length;
+    showResult('foundry-connect-status', `Connected to ${title}${gen}. ${foundryPacksCache.length} pack(s), ${rtCount} roll-table pack(s) found.`, 'success');
     renderFoundryPacks();
+    renderFoundryRtPacks();
     document.getElementById('foundry-packs-ui').classList.remove('hidden');
   } catch (e) {
     showResult('foundry-connect-status', `Connection failed: ${e.message}`, 'error');
@@ -325,17 +332,101 @@ async function importFoundry() {
     showResult('foundry-result', `Imported ${data.imported ?? 0} monster${data.imported !== 1 ? 's' : ''}.`, 'success');
     document.getElementById('foundry-result').classList.remove('hidden');
 
-    // Release Foundry socket
-    appFetch('/api/import/foundry/release', { method: 'POST' }).catch(() => {});
-    foundryPacksCache = [];
-    selectedPackIds.clear();
-    document.getElementById('foundry-packs-ui').classList.add('hidden');
+    // Only release if roll tables are also done (or empty).
+    if (selectedRtPackIds.size === 0) {
+      appFetch('/api/import/foundry/release', { method: 'POST' }).catch(() => {});
+      foundryPacksCache = [];
+      selectedPackIds.clear();
+      foundryRtPacksCache = [];
+      selectedRtPackIds.clear();
+      document.getElementById('foundry-packs-ui').classList.add('hidden');
+    }
   } catch (e) {
     showResult('foundry-result', `Import failed: ${e.message}`, 'error');
     document.getElementById('foundry-result').classList.remove('hidden');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Import selected packs';
+  }
+}
+
+function renderFoundryRtPacks() {
+  const listEl = document.getElementById('foundry-rt-packs-list');
+  listEl.innerHTML = '';
+
+  if (!foundryRtPacksCache.length) {
+    listEl.innerHTML = '<p class="muted">No roll-table packs found. Make sure the Pirate Borg system/modules are active in Foundry.</p>';
+    return;
+  }
+
+  // Known DATD source for targeted import label.
+  const DATD_ID = 'pirate-borg-down-among-the-dead';
+
+  foundryRtPacksCache.forEach(p => {
+    const subtitle = p.active
+      ? p.packageTitle
+      : `${p.packageTitle} · inactive (enable in Foundry)`;
+    const item = makeListItem(`rtpack-${p.id}`, p.label, subtitle, !p.active);
+    if (!p.active) item.disabled = true;
+
+    // Pre-select all active packs.
+    if (p.active) {
+      item.checked = true;
+      selectedRtPackIds.add(p.id);
+    }
+
+    item.addEventListener('change', () => {
+      if (item.checked) selectedRtPackIds.add(p.id);
+      else selectedRtPackIds.delete(p.id);
+      document.getElementById('btn-import-rolltables').disabled = selectedRtPackIds.size === 0;
+    });
+    listEl.appendChild(item.parentElement);
+  });
+
+  document.getElementById('btn-import-rolltables').disabled = selectedRtPackIds.size === 0;
+}
+
+async function importRollTables() {
+  if (selectedRtPackIds.size === 0) return;
+
+  const btn = document.getElementById('btn-import-rolltables');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+
+  try {
+    // DATD gets a targeted import — only fetch the specific ASH table by name.
+    const DATD_ID = 'pirate-borg-down-among-the-dead';
+    const packIds = Array.from(selectedRtPackIds);
+    const datdSelected = packIds.some(id => {
+      const pack = foundryRtPacksCache.find(p => p.id === id);
+      return pack && pack.packageId === DATD_ID;
+    });
+    const targetTableNames = datdSelected ? ['ASH Effects', 'Ash Effects', 'ASH'] : [];
+
+    const res = await appFetch('/api/import/foundry/rolltables', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ packIds, targetTableNames }),
+    });
+    if (!res.ok) throw new Error(await extractError(res));
+    const data = await res.json();
+    const count = data.imported ?? 0;
+    showResult('foundry-rt-result', `Imported ${count} roll table${count !== 1 ? 's' : ''}. They will appear in the Farsight Resources tab.`, 'success');
+    document.getElementById('foundry-rt-result').classList.remove('hidden');
+
+    // Release Foundry socket after all imports are done.
+    appFetch('/api/import/foundry/release', { method: 'POST' }).catch(() => {});
+    foundryPacksCache = [];
+    selectedPackIds.clear();
+    foundryRtPacksCache = [];
+    selectedRtPackIds.clear();
+    document.getElementById('foundry-packs-ui').classList.add('hidden');
+  } catch (e) {
+    showResult('foundry-rt-result', `Import failed: ${e.message}`, 'error');
+    document.getElementById('foundry-rt-result').classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Import roll tables';
   }
 }
 
